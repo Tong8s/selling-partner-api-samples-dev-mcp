@@ -137,7 +137,7 @@ export class OrdersApiTool {
       baseUrl: config?.baseUrl || "https://sellingpartnerapi-na.amazon.com",
     };
 
-    this.hasCredentials = !(
+    this.hasCredentials = !!(
       this.config.clientId &&
       this.config.clientSecret &&
       this.config.refreshToken

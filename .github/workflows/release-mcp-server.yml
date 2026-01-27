@@ -97,6 +97,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Create Git tag
         run: |
@@ -106,12 +108,10 @@ jobs:
           git push origin "mcp-server-v${{ github.event.inputs.newVersionNumber }}"
       
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "mcp-server-v${{ github.event.inputs.newVersionNumber }}"
-          release_name: "MCP Server v${{ github.event.inputs.newVersionNumber }}"
+          name: "MCP Server v${{ github.event.inputs.newVersionNumber }}"
           body: |
             ## SP-API Dev MCP Server v${{ github.event.inputs.newVersionNumber }}
             
@@ -127,3 +127,4 @@ jobs:
             - NPM: https://www.npmjs.com/package/@amazon-sp-api-release/dev-mcp/v/${{ github.event.inputs.newVersionNumber }}
           draft: false
           prerelease: false
+          generate_release_notes: true

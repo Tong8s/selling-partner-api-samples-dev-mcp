@@ -65,11 +65,8 @@ Create a tool file in the appropriate `src/tools/` subdirectory:
 
 ```typescript
 // src/tools/api-tools/my-api-tools.ts
-import { credentialStore } from "../../auth/credential-store.js";
-import { SPAPIAuth } from "../../auth/sp-api-auth.js";
 
 export interface MyToolArgs {
-  action: "action1" | "action2";
   param1: string;
   param2?: number;
 }
@@ -80,41 +77,7 @@ export interface ToolResponse {
 }
 
 export class MyApiTool {
-  async handleRequest(args: MyToolArgs): Promise<ToolResponse> {
-    // Check credentials if needed
-    if (!credentialStore.isConfigured()) {
-      return {
-        content: [{ type: "text", text: "❌ Credentials required" }],
-        isError: true,
-      };
-    }
 
-    switch (args.action) {
-      case "action1":
-        return this.doAction1(args);
-      case "action2":
-        return this.doAction2(args);
-      default:
-        return {
-          content: [{ type: "text", text: `Unknown action: ${args.action}` }],
-          isError: true,
-        };
-    }
-  }
-
-  private async doAction1(args: MyToolArgs): Promise<ToolResponse> {
-    // Implementation
-    return {
-      content: [{ type: "text", text: "Action 1 completed" }],
-    };
-  }
-
-  private async doAction2(args: MyToolArgs): Promise<ToolResponse> {
-    // Implementation
-    return {
-      content: [{ type: "text", text: "Action 2 completed" }],
-    };
-  }
 }
 ```
 
@@ -163,57 +126,15 @@ Create test files mirroring the source structure:
 import { myToolSchema } from "../../src/zod-schemas/my-tool-schemas";
 
 describe("myToolSchema", () => {
-  it("should accept valid input", () => {
-    const result = myToolSchema.safeParse({
-      action: "action1",
-      param1: "test",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("should reject invalid action", () => {
-    const result = myToolSchema.safeParse({
-      action: "invalid",
-      param1: "test",
-    });
-    expect(result.success).toBe(false);
-  });
+  
 });
 ```
 
 ```typescript
 // tests/tools/my-api-tools.test.ts
 import { MyApiTool } from "../../src/tools/api-tools/my-api-tools";
-import { credentialStore } from "../../src/auth/credential-store";
 
 describe("MyApiTool", () => {
-  let tool: MyApiTool;
-
-  beforeEach(() => {
-    tool = new MyApiTool();
-    credentialStore.clearCredentials();
-  });
-
-  it("should return error without credentials", async () => {
-    const result = await tool.handleRequest({
-      action: "action1",
-      param1: "test",
-    });
-    expect(result.isError).toBe(true);
-  });
-
-  it("should handle action1", async () => {
-    credentialStore.setCredentials({
-      clientId: "test",
-      clientSecret: "test",
-      refreshToken: "test",
-    });
-
-    const result = await tool.handleRequest({
-      action: "action1",
-      param1: "test",
-    });
-    expect(result.isError).toBeUndefined();
   });
 });
 ```
@@ -256,7 +177,7 @@ npm run type-check    # TypeScript type checking
        "sp-api-dev-mcp": {
          "command": "node",
          "args": ["/absolute/path/to/sp-api-dev-mcp/dist/index.js"],
-         "env": {
+         "env": { //optional
            "SP_API_CLIENT_ID": "your_client_id",
            "SP_API_CLIENT_SECRET": "your_client_secret",
            "SP_API_REFRESH_TOKEN": "your_refresh_token"

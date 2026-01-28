@@ -1,5 +1,6 @@
 import { OrdersApiTool } from "../../src/tools/api-tools/orders-api-tools";
 import { SPAPIAuth } from "../../src/auth/sp-api-auth";
+import { credentialStore } from "../../src/auth/credential-store";
 
 jest.mock("../../src/auth/sp-api-auth");
 
@@ -7,7 +8,7 @@ describe("OrdersApiTool", () => {
   let ordersApiTool: OrdersApiTool;
   let mockAuth: jest.Mocked<SPAPIAuth>;
 
-  const mockConfig = {
+  const mockCredentials = {
     clientId: "test-client-id",
     clientSecret: "test-client-secret",
     refreshToken: "test-refresh-token",
@@ -16,14 +17,21 @@ describe("OrdersApiTool", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAuth = new SPAPIAuth(mockConfig) as jest.Mocked<SPAPIAuth>;
-    ordersApiTool = new OrdersApiTool(mockConfig);
-    (ordersApiTool as any).auth = mockAuth;
+    credentialStore.clearCredentials();
+    ordersApiTool = new OrdersApiTool();
+    
+    // Setup mock auth
+    mockAuth = {
+      makeAuthenticatedRequest: jest.fn(),
+    } as any;
+    
+    // Mock SPAPIAuth constructor to return our mock
+    (SPAPIAuth as jest.MockedClass<typeof SPAPIAuth>).mockImplementation(() => mockAuth);
   });
 
   describe("constructor", () => {
     it("should initialize with credentials", () => {
-      const tool = new OrdersApiTool(mockConfig);
+      const tool = new OrdersApiTool();
       expect(tool).toBeInstanceOf(OrdersApiTool);
     });
 
@@ -31,21 +39,11 @@ describe("OrdersApiTool", () => {
       const tool = new OrdersApiTool();
       expect(tool).toBeInstanceOf(OrdersApiTool);
     });
-
-    it("should use default base URL if not provided", () => {
-      const tool = new OrdersApiTool({
-        clientId: "test",
-        clientSecret: "test",
-        refreshToken: "test",
-      });
-      expect(tool).toBeInstanceOf(OrdersApiTool);
-    });
   });
 
   describe("searchOrders", () => {
     it("should return error if no credentials provided", async () => {
-      const toolWithoutCreds = new OrdersApiTool();
-      const result = await toolWithoutCreds.searchOrders({
+      const result = await ordersApiTool.searchOrders({
         createdAfter: "2025-01-01T00:00:00Z",
       });
 
@@ -54,6 +52,8 @@ describe("OrdersApiTool", () => {
     });
 
     it("should return error if neither createdAfter nor lastUpdatedAfter provided", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       const result = await ordersApiTool.searchOrders({
         marketplaceIds: ["ATVPDKIKX0DER"],
       });
@@ -65,6 +65,8 @@ describe("OrdersApiTool", () => {
     });
 
     it("should successfully search orders", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       const mockResponse = {
         data: {
           orders: [
@@ -77,9 +79,7 @@ describe("OrdersApiTool", () => {
         },
       };
 
-      mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce(
-        mockResponse as any,
-      );
+      mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce(mockResponse as any);
 
       const result = await ordersApiTool.searchOrders({
         createdAfter: "2025-01-01T00:00:00Z",
@@ -99,6 +99,8 @@ describe("OrdersApiTool", () => {
     });
 
     it("should handle API errors", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       mockAuth.makeAuthenticatedRequest.mockRejectedValueOnce(
         new Error("API Error"),
       );
@@ -114,8 +116,7 @@ describe("OrdersApiTool", () => {
 
   describe("getOrder", () => {
     it("should return error if no credentials provided", async () => {
-      const toolWithoutCreds = new OrdersApiTool();
-      const result = await toolWithoutCreds.getOrder({
+      const result = await ordersApiTool.getOrder({
         orderId: "123-4567890-1234567",
       });
 
@@ -124,6 +125,8 @@ describe("OrdersApiTool", () => {
     });
 
     it("should successfully get order details", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       const mockResponse = {
         data: {
           order: {
@@ -135,9 +138,7 @@ describe("OrdersApiTool", () => {
         },
       };
 
-      mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce(
-        mockResponse as any,
-      );
+      mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce(mockResponse as any);
 
       const result = await ordersApiTool.getOrder({
         orderId: "123-4567890-1234567",
@@ -159,8 +160,7 @@ describe("OrdersApiTool", () => {
 
   describe("cancelOrder", () => {
     it("should return error if no credentials provided", async () => {
-      const toolWithoutCreds = new OrdersApiTool();
-      const result = await toolWithoutCreds.cancelOrder({
+      const result = await ordersApiTool.cancelOrder({
         orderId: "123-4567890-1234567",
         cancelReasonCode: "NO_INVENTORY",
       });
@@ -170,6 +170,8 @@ describe("OrdersApiTool", () => {
     });
 
     it("should successfully cancel order", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce({
         data: {},
       } as any);
@@ -191,7 +193,20 @@ describe("OrdersApiTool", () => {
   });
 
   describe("updateShipmentStatus", () => {
+    it("should return error if no credentials provided", async () => {
+      const result = await ordersApiTool.updateShipmentStatus({
+        orderId: "123-4567890-1234567",
+        marketplaceId: "ATVPDKIKX0DER",
+        shipmentStatus: "PickedUp",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Credentials Required");
+    });
+
     it("should successfully update shipment status", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce({
         data: { success: true },
       } as any);
@@ -217,7 +232,24 @@ describe("OrdersApiTool", () => {
   });
 
   describe("confirmShipment", () => {
+    it("should return error if no credentials provided", async () => {
+      const result = await ordersApiTool.confirmShipment({
+        orderId: "123-4567890-1234567",
+        marketplaceId: "ATVPDKIKX0DER",
+        packageDetail: {
+          packageReferenceId: "PKG123",
+          carrierCode: "UPS",
+          shipDate: "2025-01-20T00:00:00Z",
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Credentials Required");
+    });
+
     it("should successfully confirm shipment", async () => {
+      credentialStore.setCredentials(mockCredentials);
+      
       mockAuth.makeAuthenticatedRequest.mockResolvedValueOnce({
         data: { success: true },
       } as any);

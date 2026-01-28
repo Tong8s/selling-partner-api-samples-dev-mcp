@@ -2,11 +2,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  OrdersApiTool,
-  SPAPIConfig,
-} from "./tools/api-tools/orders-api-tools.js";
+import { OrdersApiTool } from "./tools/api-tools/orders-api-tools.js";
 import { SPAPIMigrationAssistantTool } from "./tools/migration-assistant-tools/migration-tools.js";
+import { CredentialTools } from "./tools/auth-tools/credential-tools.js";
 import {
   searchOrdersSchema,
   getOrderSchema,
@@ -17,31 +15,26 @@ import {
   getOrderRegulatedInfoSchema,
 } from "./zod-schemas/orders-schemas.js";
 import { migrationAssistantSchema } from "./zod-schemas/migration-schemas.js";
+import { credentialToolSchema } from "./zod-schemas/credential-schemas.js";
 import { config } from "dotenv";
 
 config();
-
-interface ConfigFile {
-  SP_API_CLIENT_ID?: string;
-  SP_API_CLIENT_SECRET?: string;
-  SP_API_REFRESH_TOKEN?: string;
-  SP_API_BASE_URL?: string;
-}
 
 class SPAPIDevMCPServer {
   private server: McpServer;
   private ordersApiTool: OrdersApiTool;
   private migrationAssistantTool: SPAPIMigrationAssistantTool;
+  private credentialTools: CredentialTools;
 
   constructor() {
     this.server = new McpServer({
       name: "selling-partner-api-dev-mcp",
-      version: "1.1.0",
+      version: "1.2.0",
     });
 
-    const config = this.getAuthFromEnv();
-    this.ordersApiTool = new OrdersApiTool(config);
+    this.ordersApiTool = new OrdersApiTool();
     this.migrationAssistantTool = new SPAPIMigrationAssistantTool();
+    this.credentialTools = new CredentialTools();
     this.setupTools();
   }
 
@@ -143,20 +136,24 @@ class SPAPIDevMCPServer {
         return await this.migrationAssistantTool.migrationAssistant(args);
       },
     );
+
+    // Register Unified Credential Management Tool
+    this.server.registerTool(
+      "credentials",
+      {
+        description:
+          "Manage SP-API credentials. Actions: 'configure' to set clientId, clientSecret, refreshToken, baseUrl (region: 'na', 'eu', 'fe' or full URL); 'status' to check current configuration; 'clear' to remove all credentials. Credentials are stored in memory until server restart.",
+        inputSchema: credentialToolSchema,
+      },
+      async (args: any) => {
+        return this.credentialTools.handleCredentials(args);
+      },
+    );
   }
 
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-  }
-
-  private getAuthFromEnv(): SPAPIConfig {
-    return {
-      clientId: process.env.SP_API_CLIENT_ID,
-      clientSecret: process.env.SP_API_CLIENT_SECRET,
-      refreshToken: process.env.SP_API_REFRESH_TOKEN,
-      baseUrl: process.env.SP_API_BASE_URL,
-    };
   }
 }
 

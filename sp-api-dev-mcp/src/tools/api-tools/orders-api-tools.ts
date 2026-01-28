@@ -1,4 +1,5 @@
 import { SPAPIAuth } from "../../auth/sp-api-auth.js";
+import { credentialStore } from "../../auth/credential-store.js";
 
 // Type Definitions
 export interface SPAPIConfig {
@@ -127,46 +128,54 @@ export interface ToolResponse {
 }
 
 export class OrdersApiTool {
-  private config: SPAPIConfig;
-  private auth?: SPAPIAuth;
-  private hasCredentials: boolean;
-
-  constructor(config?: SPAPIConfig) {
-    this.config = {
-      ...config,
-      baseUrl: config?.baseUrl || "https://sellingpartnerapi-na.amazon.com",
-    };
-
-    this.hasCredentials = !!(
-      this.config.clientId &&
-      this.config.clientSecret &&
-      this.config.refreshToken
-    );
-
-    if (this.hasCredentials) {
-      this.auth = new SPAPIAuth(this.config);
+  private getAuth(): SPAPIAuth | null {
+    // First check credential store (runtime configured)
+    const storeCredentials = credentialStore.getCredentials();
+    if (credentialStore.isConfigured()) {
+      return new SPAPIAuth({
+        clientId: storeCredentials.clientId,
+        clientSecret: storeCredentials.clientSecret,
+        refreshToken: storeCredentials.refreshToken,
+        baseUrl: storeCredentials.baseUrl,
+      });
     }
+    return null;
+  }
+
+  private getBaseUrl(): string {
+    const storeCredentials = credentialStore.getCredentials();
+    return (
+      storeCredentials.baseUrl || "https://sellingpartnerapi-na.amazon.com"
+    );
   }
 
   private checkCredentials(): ToolResponse | null {
-    if (!this.hasCredentials) {
+    if (!credentialStore.isConfigured()) {
       return {
         content: [
           {
             type: "text",
             text: `❌ **SP-API Credentials Required**
 
-To use this tool, you need to provide SP-API credentials
+To use this tool, you need to configure SP-API credentials first.
 
-**Environment variables**:
+**Option 1: Use the configure_credentials tool**
+\`\`\`
+Configure my SP-API credentials:
+- Client ID: amzn1.application-oa2-client.xxx
+- Client Secret: your_secret
+- Refresh Token: Atzr|xxx
+- Region: na
+\`\`\`
+
+**Option 2: Set environment variables**
 \`\`\`bash
 export SP_API_CLIENT_ID="your_client_id"
 export SP_API_CLIENT_SECRET="your_client_secret"
 export SP_API_REFRESH_TOKEN="your_refresh_token"
-export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
 \`\`\`
 
-**Note:** The migration assistant tool does not require credentials and can be used without API access.`,
+**Note:** The migration assistant tool does not require credentials.`,
           },
         ],
         isError: true,
@@ -228,9 +237,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     }
 
     try {
-      const response = await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      const response = await auth.makeAuthenticatedRequest(
         "GET",
-        `${this.config.baseUrl}/orders/2026-01-01/orders`,
+        `${this.getBaseUrl()}/orders/2026-01-01/orders`,
         queryParams,
       );
 
@@ -267,9 +277,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     }
 
     try {
-      const response = await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      const response = await auth.makeAuthenticatedRequest(
         "GET",
-        `${this.config.baseUrl}/orders/2026-01-01/orders/${orderId}`,
+        `${this.getBaseUrl()}/orders/2026-01-01/orders/${orderId}`,
         queryParams,
       );
 
@@ -305,9 +316,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     };
 
     try {
-      await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      await auth.makeAuthenticatedRequest(
         "PUT",
-        `${this.config.baseUrl}/orders/2026-01-01/orders/${orderId}/cancellation`,
+        `${this.getBaseUrl()}/orders/2026-01-01/orders/${orderId}/cancellation`,
         {},
         requestBody,
       );
@@ -352,9 +364,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     }
 
     try {
-      const response = await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      const response = await auth.makeAuthenticatedRequest(
         "POST",
-        `${this.config.baseUrl}/orders/v0/orders/${orderId}/shipment`,
+        `${this.getBaseUrl()}/orders/v0/orders/${orderId}/shipment`,
         {},
         requestBody,
       );
@@ -394,9 +407,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     };
 
     try {
-      const response = await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      const response = await auth.makeAuthenticatedRequest(
         "PATCH",
-        `${this.config.baseUrl}/orders/v0/orders/${orderId}/regulatedInfo`,
+        `${this.getBaseUrl()}/orders/v0/orders/${orderId}/regulatedInfo`,
         {},
         requestBody,
       );
@@ -438,9 +452,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     }
 
     try {
-      const response = await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      const response = await auth.makeAuthenticatedRequest(
         "POST",
-        `${this.config.baseUrl}/orders/v0/orders/${orderId}/shipmentConfirmation`,
+        `${this.getBaseUrl()}/orders/v0/orders/${orderId}/shipmentConfirmation`,
         {},
         requestBody,
       );
@@ -475,9 +490,10 @@ export SP_API_BASE_URL="https://sellingpartnerapi-na.amazon.com"
     const { orderId } = args;
 
     try {
-      const response = await this.auth!.makeAuthenticatedRequest(
+      const auth = this.getAuth()!;
+      const response = await auth.makeAuthenticatedRequest(
         "GET",
-        `${this.config.baseUrl}/orders/v0/orders/${orderId}/regulatedInfo`,
+        `${this.getBaseUrl()}/orders/v0/orders/${orderId}/regulatedInfo`,
         {},
       );
 

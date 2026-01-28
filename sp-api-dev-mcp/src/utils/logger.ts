@@ -9,6 +9,7 @@ export interface LogEntry {
   pid: number;
 }
 
+//This class is for local debugging and will NOT be released.
 export class Logger {
   private logStream: WriteStream;
   private logPath: string;
